@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+
+[dev-packages]
+black = "*"
+mypy = "*"
+flake8 = "*"
+
+[requires]
+python_version = "3.9"
+
+[scripts]
+qa = "sh -c 'pipenv run checkformat && pipenv run typecheck && pipenv run lint'"
+checkformat = "black --check ."
+lint = "flake8 --ignore E501,E203"
+format = "black ."
+typecheck = "mypy --strict ."
+review = "python review.py"
