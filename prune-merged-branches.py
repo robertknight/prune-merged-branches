@@ -29,6 +29,23 @@ def merge_will_produce_changes(main_branch: str, dev_branch: str) -> bool:
     return merge_has_changes
 
 
+def branch_commits_already_applied(main_branch: str, dev_branch: str) -> bool:
+    """
+    Check if all commits in `dev_branch` already exist in `main_branch`.
+
+    This compares commits based on the diff they introduced, ignoring the commit
+    ID and metadata. This matches how `git rebase` decides whether to skip a
+    commit when rebasing. As a result, this function asks "would rebasing
+    dev_branch on main_branch result in a branch that is identical to main_branch"?
+    """
+
+    # `git cherry <upstream> <head>` lists all commits in <head> which are not
+    # in <upstream> prefixed with a +/- status. A "-" status indicates there is
+    # an equivalent (same diff) commit in `<upstream>`.
+    commits = run_cmd(["git", "cherry", main_branch, dev_branch])
+    return all([commit_line.startswith("-") for commit_line in commits])
+
+
 def local_branches(main_branch: str) -> List[str]:
     branches = [b.replace("*", "").strip() for b in run_cmd(["git", "branch"])]
     branches = [b for b in branches if b != main_branch]
@@ -100,10 +117,13 @@ for branch in merged_branches:
     except CalledProcessError:
         print(f"Could not delete {branch} automatically")
 
-# Delete all branches that would not produce any changes if merged into main.
+# Delete all branches that would not produce any changes if rebased and merged
+# onto the main branch.
 for branch in local_branches(main_branch):
     if branch in IGNORED_BRANCHES:
         continue
+
+    # First check for a no-op merge.
     merge_has_changes = True
     try:
         merge_has_changes = merge_will_produce_changes(main_branch, branch)
@@ -114,6 +134,17 @@ for branch in local_branches(main_branch):
         print(
             f"Merging {branch} into {main_branch} would not produce any changes. Delete it? [y/n]"
         )
+        if prompt_yes_no():
+            delete_branch(branch, force=True)
+        break
+
+    # A hypothetical merge can produce changes even if all the commits have been
+    # merged. This can happen if the branch was remotely rebased prior to being
+    # merged for example. Handle this by checking whether all the commits on
+    # the branch are already present in main.
+    all_commits_in_main = branch_commits_already_applied(main_branch, branch)
+    if all_commits_in_main:
+        print(f"All commits in {branch} are already in {main_branch}. Delete it? [y/n]")
         if prompt_yes_no():
             delete_branch(branch, force=True)
 
