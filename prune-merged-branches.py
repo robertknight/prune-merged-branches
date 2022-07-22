@@ -136,7 +136,7 @@ for branch in local_branches(main_branch):
         )
         if prompt_yes_no():
             delete_branch(branch, force=True)
-        break
+        continue
 
     # A hypothetical merge can produce changes even if all the commits have been
     # merged. This can happen if the branch was remotely rebased prior to being
